@@ -11,4 +11,4 @@ Using the parameters obtained in the previous steps and the stereoCalibrate meth
 
 Finally, a mapping required to find the undistorted and rectified stereo image pair is obtained using the initUndistortRectifyMap method.
 
-This mapping is applied to the original images to get a rectified undistorted stereo image pair. 
+This mapping is applied to the original images to get a rectified undistorted stereo image pair.
