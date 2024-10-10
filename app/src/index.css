@@ -1,0 +1,44 @@
+html, body {
+  background-color: black;
+  display: flex;
+  justify-content: center;
+  flex: 1;
+}
+
+button {
+  padding: 10px;
+  min-width: 100px;
+  background-color: aqua;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: lightblue;
+  cursor: pointer;
+}
+
+.content {
+  max-width: 1000px;
+  display: grid;
+  gap: 10px;
+}
+
+.video {
+  width: 100%;
+  max-width: 100%;
+  min-width: 640px;
+  background-color: #000;
+  border: 1px solid #333;
+  border-radius: 10px;
+  box-sizing: border-box;
+  aspect-ratio: 640/480;
+}
+
+.controls {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
