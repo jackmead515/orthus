@@ -92,13 +92,6 @@ export default class App extends React.PureComponent {
 		});
   }
 
-  playStream() {
-    this.socket.send('play_stream');
-  }
-
-  pauseStream() {
-    this.socket.send('stop_stream');
-  }
 
   startStream() {
     const host = window.location.hostname;
@@ -165,8 +158,7 @@ export default class App extends React.PureComponent {
         <div className="controls">
           <div className="controls--buttons">
             <button onClick={() => this.startStream()}>Stream and Record</button>
-            <button onClick={() => this.pauseStream()}>Stop Streaming</button>
-            <button onClick={() => this.killStream()}>Stop Recording</button>
+            <button onClick={() => this.killStream()}>Stop</button>
           </div>
           <div className="controls--status">
             {this.renderConnected()}
