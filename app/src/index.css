@@ -1,14 +1,30 @@
+:root {
+  --color-background: #000000;
+  --color-primary: #4234be;
+  --color-secondary: #604bc7;
+  --color-tertiary: #7a63d0;
+  --color-border: #333333;
+  --color-text: #ffffff;
+}
+
 html, body {
-  background-color: black;
+  background-color: var(--color-background);
   display: flex;
   justify-content: center;
   flex: 1;
+  color: var(--color-text);
+  font-family: Arial, sans-serif;
+}
+
+body { 
+  padding: 20px;
+  margin: 0px;
 }
 
 button {
   padding: 10px;
   min-width: 100px;
-  background-color: aqua;
+  background-color: var(--color-primary);
   border: none;
   border-radius: 5px;
   color: white;
@@ -16,12 +32,11 @@ button {
 }
 
 button:hover {
-  background-color: lightblue;
+  background-color: var(--color-secondary);
   cursor: pointer;
 }
 
 .content {
-  max-width: 1000px;
   display: grid;
   gap: 10px;
 }
@@ -30,15 +45,50 @@ button:hover {
   width: 100%;
   max-width: 100%;
   min-width: 640px;
+  min-height: 360px;
   background-color: #000;
-  border: 1px solid #333;
-  border-radius: 10px;
+  border: 2px solid var(--color-border);
+  border-radius: 5px;
   box-sizing: border-box;
-  aspect-ratio: 640/480;
 }
 
 .controls {
   width: 100%;
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
+}
+
+.controls--buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.controls--status {
+  display: flex;
+  flex-direction: column;
+}
+
+.connected {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  font-variant: all-petite-caps;
+  font-weight: bold;
+}
+
+.connected--true {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: lime;
+}
+
+.connected--false {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: red;
 }

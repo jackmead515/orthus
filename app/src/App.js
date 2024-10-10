@@ -34,10 +34,14 @@ export default class App extends React.PureComponent {
   constructor(props) {
     super(props);
 
-    this.state = {};
+    this.state = {
+      connected: false,
+      streaming: false,
+    };
 
     this.socket = undefined;
     this.player = undefined;
+    this.streamingTimeout = undefined;
   }
 
   componentDidMount() {
@@ -48,8 +52,6 @@ export default class App extends React.PureComponent {
 			//transports: ['websocket']
 		});
 		this.socket.binaryType = 'arraybuffer';
-
-    //this.socket = new WebSocket(`ws://${host}:5454`);
   
     const canvas = document.getElementById('video-canvas');
 
@@ -62,18 +64,28 @@ export default class App extends React.PureComponent {
 
 
 		this.socket.on('open', () => {
-			console.log('connected', this.socket);
+      this.setState({ connected: true });
 
 			this.socket.on('data', data => {
-        //console.log('data', data);
 				if (!isNaN(data.byteLength)) {
+          
+          if (!this.state.streaming) {
+            this.setState({ streaming: true });
+            if (this.streamingTimeout) clearTimeout(this.streamingTimeout);
+            this.streamingTimeout = setTimeout(() => this.setState({ streaming: false }), 5000);
+          } else {
+            if (this.streamingTimeout) clearTimeout(this.streamingTimeout);
+            this.streamingTimeout = setTimeout(() => this.setState({ streaming: false }), 5000);
+          }
+
 					this.player.source.write(data);
 				}
 			});
   
 		});
 		this.socket.on('close', (error) => {
-			console.log('disconnected', error);
+      if (this.streamingTimeout) clearTimeout(this.streamingTimeout);
+      this.setState({ connected: false, streaming: false });
 		})
 		this.socket.on('error', (error) => {
 			console.log('error', error);
@@ -108,16 +120,58 @@ export default class App extends React.PureComponent {
     this.socket.send('stop_stream');
   }
 
+  renderStreaming() {
+    if (this.state.streaming) {
+      return (
+        <div class="connected">
+          Streaming
+          <div class='connected--true'></div>
+        </div>
+      )
+    }
+
+    return (
+      <div class="connected">
+        Not Streaming
+        <div class='connected--false'></div>
+      </div>
+    )
+  }
+
+  renderConnected() {
+    if (this.state.connected) {
+      return (
+        <div class="connected">
+          Connected
+          <div class='connected--true'></div>
+        </div>
+      )
+    }
+
+    return (
+      <div class="connected">
+        Disconnected
+        <div class='connected--false'></div>
+      </div>
+    )
+  }
+
   render() {
     return (
       <div className='content'>
-        <canvas className='video' id="video-canvas"></canvas>
+        <canvas className='video' id="video-canvas">
+          
+        </canvas>
         <div className="controls">
-          <button onClick={() => this.playStream()}>Play</button>
-          <button onClick={() => this.pauseStream()}>Pause</button>
-          <button onClick={() => this.startStream()}>Start</button>
-          <button onClick={() => this.killStream()}>Kill</button>
-
+          <div className="controls--buttons">
+            <button onClick={() => this.startStream()}>Stream and Record</button>
+            <button onClick={() => this.pauseStream()}>Stop Streaming</button>
+            <button onClick={() => this.killStream()}>Stop Recording</button>
+          </div>
+          <div className="controls--status">
+            {this.renderConnected()}
+            {this.renderStreaming()}
+          </div>
         </div>
       </div>
     );

@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   orthus-relay:
     privileged: true
     network_mode: "host"
-    image: jackmead515/orthus-relay:0.0.2-arch
+    image: jackmead515/orthus-relay:0.0.3-arch
     ports:
       - "5454:5454"
     environment:
@@ -17,24 +15,14 @@ services:
     network_mode: "host"
     volumes:
       - /dev/:/dev/
-      - /data/:/tmp/
-    image: jackmead515/orthus-app:0.0.2-arch
+      - /home/user/Documents/recordings:/data/
+    image: jackmead515/orthus-app:0.0.3-arch
     ports:
       - "8000:8000"
     environment:
       - STREAM_NAME=webcam
       - STREAM_HOST=0.0.0.0
       - STREAM_PORT=3131
-      - INFPS=30
-      - INRES=2560x720
-      - OUTRES=2560x720
-      - OUTFPS=30
-      - BITRATE=1024k
-      - THREADS=0
-      - VSYNC=2
-      - SEGMENT_TIME=10
-      - VIDEO_INDEX=0
-      - ARCHIVE=1
-      - GRAYSCALE=0
+      - STREAM_CONFIG="ffmpeg -an -f v4l2 -i /dev/video0 -video_size 2560x720 -framerate 30 -threads 4 -f tee -map 0:v -f segment -vcodec mjpeg -qscale:v 3 -segment_time 10 -reset_timestamps 1 -strftime 1 %s.mp4 -map 0:v -f mpegts -vcodec mpeg1video -qscale:v 18 -vf \"crop=(iw/2):ih:0:0\" udp://0.0.0.0:3131"
       - RECORD_DIRECTORY=/data
       - DEBUG=true
