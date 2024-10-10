@@ -4,7 +4,7 @@ services:
   orthus-relay:
     privileged: true
     network_mode: "host"
-    image: jackmead515/orthus-relay:latest
+    image: jackmead515/orthus-relay:0.0.1
     ports:
       - "5454:5454"
     environment:
@@ -16,7 +16,7 @@ services:
     volumes:
       - /dev/:/dev/
       - /data/:/tmp/
-    image: jackmead515/orthus-app:latest
+    image: jackmead515/orthus-app:0.0.1
     ports:
       - "8000:8000"
     environment:
