@@ -4,11 +4,13 @@ services:
   orthus-relay:
     privileged: true
     network_mode: "host"
-    image: jackmead515/orthus-relay:0.0.1
+    image: jackmead515/orthus-relay:0.0.2-arch
     ports:
       - "5454:5454"
     environment:
       - NODE_ENV=prod
+      - STREAM_HOST=0.0.0.0
+      - HTTP_HOST=0.0.0.0
 
   orthus-app:
     privileged: true
@@ -16,16 +18,16 @@ services:
     volumes:
       - /dev/:/dev/
       - /data/:/tmp/
-    image: jackmead515/orthus-app:0.0.1
+    image: jackmead515/orthus-app:0.0.2-arch
     ports:
       - "8000:8000"
     environment:
       - STREAM_NAME=webcam
-      - STREAM_HOST=localhost
+      - STREAM_HOST=0.0.0.0
       - STREAM_PORT=3131
       - INFPS=30
-      - INRES=640x480
-      - OUTRES=640x480
+      - INRES=2560x720
+      - OUTRES=2560x720
       - OUTFPS=30
       - BITRATE=1024k
       - THREADS=0

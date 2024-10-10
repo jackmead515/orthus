@@ -20,22 +20,7 @@ def initialize():
     
     HTTP_PORT = int(os.getenv('HTTP_PORT', HTTP_PORT))
 
-    STREAM_CONFIG = {
-        'stream_name': required_env('STREAM_NAME'),
-        'stream_host': required_env('STREAM_HOST'),
-        'stream_port': required_env('STREAM_PORT'),
-        'infps': required_env('INFPS'),
-        'inres': required_env('INRES'),
-        'outres': required_env('OUTRES'),
-        'outfps': required_env('OUTFPS'),
-        'bitrate': required_env('BITRATE'),
-        'threads': required_env('THREADS'),
-        'vsync': required_env('VSYNC'),
-        'segment_time': required_env('SEGMENT_TIME'),
-        'video_index': required_env('VIDEO_INDEX'),
-        'archive':  strtobool(required_env('ARCHIVE')),
-        'grayscale':  strtobool(required_env('GRAYSCALE')),
-    }
+    STREAM_CONFIG = required_env('STREAM_CONFIG')
     
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
     

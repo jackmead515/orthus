@@ -2,8 +2,9 @@ import logging
 import threading
 import subprocess
 import time
-
-import controllers.streams as stream_controller
+import shlex
+import signal
+from subprocess import TimeoutExpired
 
 import config
 
@@ -16,38 +17,27 @@ def kill_stream():
 
     with _streams_lock:
         if _stream is not None:
-            timeout = 5
-            while not _stream.poll():
+            _stream.send_signal(signal.SIGINT)
+            try:
+                exit_code = _stream.wait(timeout=5)
+            except TimeoutExpired:
                 _stream.kill()
-                time.sleep(1)
-                timeout -= 1
-                if timeout == 0:
-                    raise Exception('Failed to kill stream')
+
         _stream = None
-        
+
         # final any ffmpeg processes that may have been left running
         subprocess.run(['pkill', 'ffmpeg'])
 
 
 def launch_stream():
     global _stream, _streams_lock
+    
+    kill_stream()
 
     with _streams_lock:
-        
-        if _stream is not None:
-            timeout = 5
-            while not _stream.poll():
-                _stream.kill()
-                time.sleep(1)
-                timeout -= 1
-                if timeout == 0:
-                    raise Exception('Failed to kill stream')
-
-        command = stream_controller.get_pi_usb_encoding_pipeline(config.STREAM_CONFIG, config.RECORD_DIRECTORY)
-
-        logging.info(f'Running ffmpeg pipeline: {command}')
+        logging.info(f'Running ffmpeg pipeline: {shlex.split(config.STREAM_CONFIG)}')
 
         if config.DEBUG:
-            _stream = subprocess.Popen(command, shell=True)
+            _stream = subprocess.Popen(shlex.split(config.STREAM_CONFIG), shell=True, cwd=config.RECORD_DIRECTORY)
         else:
-            _stream = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            _stream = subprocess.Popen(shlex.split(config.STREAM_CONFIG), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=config.RECORD_DIRECTORY)
