@@ -1,0 +1,22 @@
+{
+  "name": "video_relay",
+  "version": "1.0.0",
+  "description": "Pipe UDP Stream Data to Websockets",
+  "main": "src/index.js",
+  "engines" : { 
+    "node" : ">=16.10.0"
+  },
+  "engineStrict": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "NODE_ENV=prod node src/index.js",
+    "start:local": "NODE_ENV=local node src/index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.21.4",
+    "engine.io": "^5.2.0",
+    "express": "^4.17.1"
+  }
+}

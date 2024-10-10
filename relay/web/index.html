@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>JSMpeg Stream Client</title>
+	<style type="text/css">
+		html, body {
+			background-color: #555;
+			display: flex;
+			justify-content: center;
+			flex: 1;
+		}
+
+		.content {
+			max-width: 1000px;
+			width: 100%;
+			display: grid;
+			gap: 10px;
+		}
+
+		.video {
+			width: 100%;
+			max-width: 100%;
+			background-color: #000;
+			border: 3px solid gray;
+			border-radius: 3px;
+			box-sizing: border-box;
+			aspect-ratio: 8/3;
+		}
+
+		.controls {
+			width: 100%;
+			display: flex;
+			gap: 10px;
+		}
+
+		.graph-buffer {
+			width: 100%;
+			height: 100%;
+		}
+
+		.graph-wrapper {
+			width: 100%;
+			height: 100px;
+			border-radius: 3px;
+			background-color: gray;
+			padding: 5px;
+			box-sizing: border-box;
+		}
+
+		svg path {
+			fill: none;
+			stroke: red;
+			stroke-width: 2px;
+			overflow: visible;
+		}
+	</style>
+	
+</head>
+<body>
+	<div class='content'>
+		<canvas class='video' id="video-canvas"></canvas>
+		<div class="controls">
+			<button onclick="playCam()">Play</button>
+			<button onclick="pauseCam()">Pause</button>
+		</div>
+		<div class="graph-wrapper">
+			<div class="graph-buffer" id="graph-buffer"></div>
+		</div>
+	</div>
+	<script src="https://unpkg.com/d3@7.0.1/dist/d3.min.js"></script>
+	<!--<script src="https://cdn.socket.io/3.1.3/socket.io.min.js"></script>-->
+	<script src="jsmpeg.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/engine.io-client/3.3.3/engine.io.min.js" integrity="sha512-PtPuppnNxP4ixLjIL4frAUz3RE4s9pG0s0z7/9OetcZN83drBxvsZ8JPfkNDKnm0EZCMTv544yJhGYAUInurtA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+	<script type="text/javascript">
+		class JSMpegWritableSource {
+			constructor(url, options) {
+				this.destination = null;
+				this.completed = false;
+				this.established = false;
+				this.progress = 0;
+				this.streaming = true;
+			}
+
+			connect(destination) {
+				this.destination = destination;
+			}
+
+			start() {
+				this.established = true;
+				this.completed = true;
+				this.progress = 1;
+			}
+
+			resume() {}
+
+			destroy() {}
+
+			write(data) {
+				this.destination.write(data);
+			}
+		}
+	</script>
+	<script type="text/javascript">
+		const canvas = document.getElementById('video-canvas');
+		const url = 'ws://localhost:5454';
+		const player = new JSMpeg.Player(null, {
+			source: JSMpegWritableSource,
+			audio: false,
+			canvas: canvas,
+		});
+		console.log(`connecting to ${url}`);
+		const socket = new eio.Socket(url, {
+			upgrade: true,
+			//transports: ['websocket']
+		});
+		socket.binaryType = 'arraybuffer';
+
+		function playCam() {
+			socket.emit('message', 'play_stream');
+		}
+
+		function pauseCam() {
+			socket.emit('message', 'stop_stream');
+		}
+
+		function setupBufferLengthGraph(data) {
+			const bb = d3.select('#graph-buffer').node().getBoundingClientRect();
+
+			const xScale = d3.scaleLinear()
+				.domain([0, 100])
+				.range([0, bb.width]);
+
+			const yScale = d3.scaleLinear()
+				.domain([0, 300])
+				.range([bb.height, 0]);
+			
+			const svg = d3.select('#graph-buffer')
+				.append('svg')
+				.attr('id', 'svg')
+				.attr('width', '100%')
+				.attr('height', '100%');
+			
+			const line = d3.line()
+				.curve(d3.curveBasis)
+				.x((_, i) => xScale(i))
+				.y((d) => yScale(d));
+			
+			svg.append('path').attr('d', line(data));
+
+			const text = svg.append("text")
+				.attr("x", 5)
+				.attr("dy", 15)
+				.text('0.000 kB/s');
+
+			return { svgBufferGraph: svg, svgBufferLine: line, svgBufferText: text };
+		}
+
+		let packetsRecieved = 0
+		let startGraphBufferLength = undefined;
+		let bufferLengthTotal = 0;
+		const bufferLengthData = new Array(100).fill(0);
+		const { svgBufferGraph, svgBufferLine, svgBufferText } = setupBufferLengthGraph(bufferLengthData);
+
+		socket.on('open', () => {
+			console.log('connected', socket);
+			socket.on('message', data => {
+				packetsRecieved += 1;
+				if (!document.hidden && !isNaN(data.byteLength)) {
+					bufferLengthTotal += data.byteLength;
+					player.source.write(data);
+				} else {
+					pauseCam();
+				}
+			});
+		});
+		socket.on('close', (error) => {
+			console.log('disconnected', error);
+		})
+		socket.on('error', (error) => {
+			console.log('error', error);
+		});
+
+		function animateBufferLengthTotal(timestamp) {
+			if (!startGraphBufferLength) {
+				startGraphBufferLength = timestamp;
+			}
+
+			const delta = timestamp - startGraphBufferLength;
+
+			if (delta >= 500) {
+				startGraphBufferLength = timestamp;
+
+				let avgkbytesTenSec = 0;
+				for (let i = 0; i < 20; i++) {
+					avgkbytesTenSec += parseFloat(bufferLengthData[i]);
+				}
+				avgkbytesTenSec /= 20;
+
+				const kbytesPerSec = parseFloat(bufferLengthTotal * 0.001 * 2).toFixed(4);
+				bufferLengthData.pop();
+				bufferLengthData.unshift(kbytesPerSec);
+				bufferLengthTotal = 0;
+				
+				svgBufferText.text(`${kbytesPerSec} kB/s. - ${avgkbytesTenSec} avg/10s - ${packetsRecieved} packets`);
+				svgBufferGraph.selectAll('path')
+					.data([bufferLengthData])
+					.attr('d', svgBufferLine);
+			}
+
+			window.requestAnimationFrame(animateBufferLengthTotal);
+		}
+
+		window.requestAnimationFrame(animateBufferLengthTotal);
+
+	</script>
+</body>
+</html>
