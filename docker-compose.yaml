@@ -17,7 +17,7 @@ services:
     restart: always
     volumes:
       - /dev/:/dev/
-      - /tmp/:/data/
+      - /home/user/Documents/recordings/:/data/
     image: jackmead515/orthus-app:0.0.4-arch
     ports:
       - "8000:8000"
@@ -25,6 +25,6 @@ services:
       - STREAM_NAME=zedorthus
       - STREAM_HOST=0.0.0.0
       - STREAM_PORT=3131
-      - STREAM_CONFIG="ffmpeg -an -f v4l2 -i /dev/video0 -video_size 2560x720 -framerate 30 -threads 4 -f tee -map 0:v -f segment -vcodec mjpeg -qscale:v 3 -segment_time 10 -reset_timestamps 1 -strftime 1 %s.mp4 -map 0:v -f mpegts -vcodec mpeg1video -qscale:v 18 -vf \"crop=(iw/2):ih:0:0\" udp://0.0.0.0:3131"
+      - STREAM_CONFIG="ffmpeg -an -f v4l2 -i /dev/video0 -video_size 2560x720 -framerate 30 -threads 4 -f tee -map 0:v -f segment -vcodec mjpeg -qscale:v 3 -segment_time 10 -reset_timestamps 1 -strftime 1 zedorthus_%s.mp4 -map 0:v -f mpegts -vcodec mpeg1video -qscale:v 18 -vf \"crop=(iw/2):ih:0:0\" udp://0.0.0.0:3131"
       - RECORD_DIRECTORY=/data
       - DEBUG=true
