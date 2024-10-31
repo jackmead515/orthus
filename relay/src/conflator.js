@@ -13,7 +13,6 @@ module.exports = function(conflater) {
       }
   
       if (messages.length > 0) {
-        //{ type: 'message', data: msg }
         messages = conflater(socket, messages);
         writeBuffer.length = 0;
         Array.prototype.push.apply(writeBuffer, nonMessages);

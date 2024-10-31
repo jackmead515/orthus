@@ -67,6 +67,7 @@ function onConnection(socket) {
     };
 
     socket.on('message', (message) => {
+
         if (message === 'play_stream') {
             console.log('client requesting stream');
             socket.state.streamRequested = true;
@@ -76,17 +77,8 @@ function onConnection(socket) {
             socket.state.streamRequested = false;
             toggleRelay();
         }
+
     });
-
-    // socket.on('play_stream', (message) => {
-    //     console.log('client message', message);
-    //     socket.state.streamRequested = true;
-    // });
-
-    // socket.on('stop_stream', (message) => {
-    //     console.log('client message', message);
-    //     socket.state.streamRequested = false;
-    // });
 
     socket.on('close', () => {
         if (eioServer.clients[socket.sid]) {
