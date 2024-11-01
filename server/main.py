@@ -25,21 +25,11 @@ def jsmpeg():
 
 if __name__ == '__main__':
     """
-    STREAM_NAME='webcam' \
-    STREAM_HOST='localhost' \
-    STREAM_PORT='3131' \
-    INFPS='30' \
-    INRES='640x480' \
-    OUTRES='640x480' \
-    OUTFPS='30' \
-    BITRATE='1024k' \
-    THREADS='0' \
-    VSYNC='2' \
-    SEGMENT_TIME='10' \
-    VIDEO_INDEX='0' \
-    ARCHIVE='1' \
-    GRAYSCALE='0' \
-    RECORD_DIRECTORY='/tmp' \
+    STREAM_NAME=zedorthus \
+    STREAM_HOST=0.0.0.0 \
+    STREAM_PORT=3131 \
+    STREAM_CONFIG="ffmpeg -an -f v4l2 -i /dev/video0 -video_size 2560x720 -framerate 30 -threads 4 -f tee -map 0:v -f segment -vcodec mjpeg -qscale:v 3 -segment_time 10 -reset_timestamps 1 -strftime 1 zedorthus_%s.mp4 -map 0:v -f mpegts -vcodec mpeg1video -qscale:v 18 -vf \"crop=(iw/2):ih:0:0\" udp://0.0.0.0:3131" \
+    RECORD_DIRECTORY=/data \
     python3 main.py
     
     curl -X POST http://localhost:8000/api/stream

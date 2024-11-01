@@ -37,11 +37,25 @@ export default class App extends React.PureComponent {
     this.state = {
       connected: false,
       streaming: false,
+      avgPacketSize: 0,
     };
 
     this.socket = undefined;
     this.player = undefined;
     this.streamingTimeout = undefined;
+
+    this.packetSizes = [];
+    this.packetSizeInterval = undefined;
+  }
+
+  componentWillUnmount() {
+    if (this.socket) {
+      this.socket.close();
+    }
+
+    if (this.packetSizeInterval) {
+      clearInterval(this.packetSizeInterval);
+    }
   }
 
   componentDidMount() {
@@ -62,6 +76,13 @@ export default class App extends React.PureComponent {
 			canvas: canvas,
 		});
 
+    this.packetSizeInterval = setInterval(() => {
+      let sum = 0;
+      this.packetSizes.forEach((size) => sum += size);
+      const avg = sum / this.packetSizes.length;
+      this.setState({ avgPacketSize: avg });
+    }, 1000);
+
 
 		this.socket.on('open', () => {
       this.setState({ connected: true });
@@ -78,7 +99,14 @@ export default class App extends React.PureComponent {
             this.streamingTimeout = setTimeout(() => this.setState({ streaming: false }), 5000);
           }
 
-					this.player.source.write(data);
+          this.packetSizes.push(data.byteLength);
+          if (this.packetSizes.length > 100) {
+            this.packetSizes.shift();
+          }
+
+          try {
+            this.player.source.write(data);
+          } catch (e) {}
 				}
 			});
   
@@ -98,7 +126,7 @@ export default class App extends React.PureComponent {
     const url = `http://${host}:8000/api/stream`;
 
     // post request to start stream
-    fetch(url, { method: 'POST' });
+    //fetch(url, { method: 'POST' });
 
     this.socket.send('play_stream');
   }
@@ -108,7 +136,7 @@ export default class App extends React.PureComponent {
     const url = `http://${host}:8000/api/stream`;
 
     // post request to start stream
-    fetch(url, { method: 'DELETE' });
+    //fetch(url, { method: 'DELETE' });
 
     this.socket.send('stop_stream');
   }
@@ -163,6 +191,7 @@ export default class App extends React.PureComponent {
           <div className="controls--status">
             {this.renderConnected()}
             {this.renderStreaming()}
+            {this.state.avgPacketSize} bytes
           </div>
         </div>
       </div>

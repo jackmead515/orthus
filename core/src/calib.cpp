@@ -6,6 +6,9 @@
 
 #include "util.h"
 
+// display opencv window for debugging
+// #define DEBUG_WINDOW
+
 namespace calib {
 
     struct FPS {
@@ -83,6 +86,10 @@ namespace calib {
                 break;
             }
 
+            if (calib::point_sets_found >= target_point_sets) {
+                break;
+            }
+
             calib::process_lock.lock();
 
             if (calib::frame.empty()) {
@@ -90,9 +97,14 @@ namespace calib {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
+
+            // copy the frame, empty the shared one, and release the lock
+            cv::Mat frame = calib::frame.clone();
+            calib::frame = cv::Mat();
+            calib::process_lock.unlock();
             
-            left_frame = calib::frame(cv::Rect(0, 0, calib::frame.cols / 2, calib::frame.rows));
-            right_frame = calib::frame(cv::Rect(calib::frame.cols / 2, 0, calib::frame.cols / 2, calib::frame.rows));
+            left_frame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
+            right_frame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
 
             if (left_frame_gray.empty()) {
                 left_frame_gray = cv::Mat(left_frame.size(), CV_8UC1);
@@ -118,18 +130,18 @@ namespace calib {
                     calib::point_sets_found += 1;
                 }
             }
+        }
 
-            // empty the frame and release the lock
-            calib::frame = cv::Mat();
-            calib::process_lock.unlock();
+        if (calib::point_sets_found >= target_point_sets) {
+            
         }
     }
 
 
     void calibrate(
         uint16_t target_point_sets,
-        std::string video_device,
-        std::string output_device,
+        std::string input_pipe,
+        std::string output_pipe,
         cv::Size resolution,
         cv::Size board_size,
         double square_size
@@ -142,29 +154,31 @@ namespace calib {
             throw std::invalid_argument("resolution must be 2560x720");
         }
 
-        if ((board_size.width != 9 && board_size.height != 6) && (board_size.width != 11 && board_size.height != 8)) {
-            throw std::invalid_argument("board_size must be 9x6 or 11x8");
-        }
-
         if (square_size <= 0.0 || square_size >= 10.0) {
             throw std::invalid_argument("square_size must be greater than 0 and less than 10");
         }
 
-        cv::VideoCapture input(video_device);
+        cv::VideoCapture input(input_pipe, cv::CAP_GSTREAMER);
 
         if (!input.isOpened()) {
-            throw std::runtime_error("Failed to open input device: " + video_device);
+            throw std::runtime_error("Failed to open input device: " + input_pipe);
         }
 
-        cv::VideoWriter output(output_device, cv::CAP_GSTREAMER, 0, 30.0, cv::Size(640, 360), true);
+        std::cout << "Input device: '" << input_pipe  << "' opened" << std::endl;
+
+        int codec = 0;
+        cv::VideoWriter output(output_pipe, cv::CAP_GSTREAMER, codec, 30.0, cv::Size(640, 360), true);
 
         if (!output.isOpened()) {
-            throw std::runtime_error("Failed to open output device: " + output_device);
+            throw std::runtime_error("Failed to open output device: " + output_pipe);
         }
+
+        std::cout << "Output device: '" << output_pipe  << "' opened" << std::endl;
 
         cv::Mat frame;
         cv::Mat left_frame;
         calib::FPS fps;
+        std::vector<cv::Point2f> point_set;
 
         auto processor_thread = std::thread{ processor, target_point_sets, board_size };
 
@@ -189,13 +203,18 @@ namespace calib {
             // resize in half based on percent
             cv::resize(left_frame, left_frame, cv::Size(), 0.5, 0.5);
 
-            // draw total point sets found
-            cv::putText(left_frame, std::to_string(calib::point_sets_found), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2);
+            // draw text for calibration mode
+            auto display_str = "Calibration Mode: " + std::to_string(calib::point_sets_found) + "/" + std::to_string(target_point_sets);
+            auto text_size = cv::getTextSize(display_str, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
+            cv::rectangle(left_frame, cv::Point(8, 8), cv::Point(text_size.width + 12, text_size.height + 12), cv::Scalar(0, 0, 0), cv::FILLED);
+            cv::putText(left_frame, display_str, cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
 
-            //cv::imshow("Calibration", left_frame);
-            // if (cv::waitKey(1) == 27) {
-            //     break;
-            // }
+            #ifdef DEBUG_WINDOW // display opencv window for debugging
+            cv::imshow("Calibration", left_frame);
+            if (cv::waitKey(1) == 27) {
+                break;
+            }
+            #endif
 
             output << left_frame;
 
