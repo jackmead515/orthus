@@ -4,3 +4,9 @@ Makefile
 orthus
 CMakeFiles/
 stats.log
+
+calibration.yml.gz
+calibration.yml
+
+points.yml.gz
+points.yml

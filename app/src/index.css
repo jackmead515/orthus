@@ -19,6 +19,11 @@ html, body {
 body { 
   padding: 20px;
   margin: 0px;
+  max-width: 1500px;
+}
+
+#root {
+  width: 100%;
 }
 
 button {
