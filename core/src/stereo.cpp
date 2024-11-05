@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include <random>
+#include <thread>
 
 #include <opencv2/opencv.hpp>
 
@@ -55,8 +56,8 @@ namespace stereo {
     };
 
     Calibration calibrate(
-        std::vector<std::vector<cv::Point2f>> left_object_points,
-        std::vector<std::vector<cv::Point2f>> right_object_points,
+        std::vector<std::vector<cv::Point2f>>& left_object_points,
+        std::vector<std::vector<cv::Point2f>>& right_object_points,
         cv::Size board_size,
         cv::Size image_size,
         double square_size,
@@ -86,9 +87,6 @@ namespace stereo {
         // Calculate the integer percentage out of 100 for the loop.
         // This is to avoid floating point errors.
         int int_perc = static_cast<int>(bucket_percentage * 100);
-
-        std::cout << "bucket_width: " << bucket_width << std::endl;
-        std::cout << "bucket_height: " << bucket_height << std::endl;
         
         for (int xp { 0 }; xp < 100; xp += int_perc) {
             for (int yp { 0 }; yp < 100; yp += int_perc) {
@@ -117,8 +115,6 @@ namespace stereo {
                 }
             }
         }
-
-        std::cout << "sampled points: " << left_points.size() << std::endl;
 
         // double col_coords[board_size.width];
         // for (int i {0}; i < board_size.width; i++) {
@@ -152,9 +148,9 @@ namespace stereo {
     
         for (int i {0}; i < left_points.size(); i++) {
             std::vector<cv::Point3f> point_coords;
-            for (int x {0}; x < board_size.height; x++) {
-                for (int y {0}; y < board_size.width; y++) {
-                    point_coords.push_back(cv::Point3f((double)y * square_size, (double)x * square_size, 0));
+            for (int x {0}; x < board_size.width; x++) {
+                for (int y {0}; y < board_size.height; y++) {
+                    point_coords.push_back(cv::Point3f((double)x * square_size, (double)y * square_size, 0));
                 }
             }
             object_points.push_back(point_coords);
@@ -170,9 +166,9 @@ namespace stereo {
         cv::Mat right_translation; // translation matrix specific to right camera
 
         cv::TermCriteria criteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, 1e-5);
-        int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_SAME_FOCAL_LENGTH };
-
-        std::cout << "Calibrating..." << std::endl;
+        //int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_SAME_FOCAL_LENGTH };
+        //int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST };
+        int flags { cv::CALIB_SAME_FOCAL_LENGTH + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_SAME_FOCAL_LENGTH };
 
         // double left_rms = cv::calibrateCamera(
         //     object_points,
@@ -275,8 +271,6 @@ namespace stereo {
             rectification_map_right
         );
 
-        std::cout << "stereo_rms: " << stereo_rms << std::endl;
-
         return Calibration {
             rms: stereo_rms,
             left_camera_matrix,
@@ -297,6 +291,58 @@ namespace stereo {
             rectification_map_left,
             rectification_map_right
         };
+    }
+
+    void avg_calibration(
+        std::vector<std::vector<cv::Point2f>>& left_object_points,
+        std::vector<std::vector<cv::Point2f>>& right_object_points,
+        cv::Size board_size,
+        cv::Size image_size,
+        double square_size,
+        double bucket_percentage,
+        int iterations,
+        int threads
+    ) {
+        std::vector<Calibration> calibrations;
+        std::mutex lock;
+
+        int completed = 0;
+
+        do {
+
+            int amount = iterations - completed;
+            if (amount > threads) amount = threads;
+
+            std::vector<std::thread> thread_pool;
+
+            for (int i {0}; i < amount; i++) {
+                thread_pool.push_back(std::thread([&] {
+                    Calibration calibration { calibrate(left_object_points, right_object_points, board_size, image_size, square_size, bucket_percentage) };
+                    lock.lock();
+                    std::cout << "rms: " << calibration.rms << std::endl;
+                    calibrations.push_back(calibration);
+                    lock.unlock();
+                }));
+            }
+
+            for (int i {0}; i < threads; i++) {
+                thread_pool[i].join();
+            }
+
+            completed += threads;
+
+        } while (completed < iterations);
+
+        double avg_rms {0};
+
+        for (int i {0}; i < calibrations.size(); i++) {
+            avg_rms += calibrations[i].rms;
+        }
+
+        avg_rms /= calibrations.size();
+
+        std::cout << "average rms: " << avg_rms << std::endl;
+
     }
 
     void calibrate_from_file(

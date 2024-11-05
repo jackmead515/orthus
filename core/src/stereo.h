@@ -29,12 +29,23 @@ namespace stereo {
     };
 
     Calibration calibrate(
-        std::vector<std::vector<cv::Point2f>> left_object_points,
-        std::vector<std::vector<cv::Point2f>> right_object_points,
+        std::vector<std::vector<cv::Point2f>>& left_object_points,
+        std::vector<std::vector<cv::Point2f>>& right_object_points,
         cv::Size board_size,
         cv::Size image_size,
         double square_size,
         double bucket_percentage
+    );
+
+    void avg_calibration(
+        std::vector<std::vector<cv::Point2f>>& left_object_points,
+        std::vector<std::vector<cv::Point2f>>& right_object_points,
+        cv::Size board_size,
+        cv::Size image_size,
+        double square_size,
+        double bucket_percentage,
+        int iterations,
+        int threads
     );
 
     void calibrate_from_file(

@@ -15,6 +15,27 @@ int main() {
     double square_size = 2.3;
     double bucket_percentage = 0.1;
 
+    // cv::FileStorage fs("points.yml.gz", cv::FileStorage::READ);
+
+    // std::vector<std::vector<cv::Point2f>> left_object_points;
+    // std::vector<std::vector<cv::Point2f>> right_object_points;
+
+    // fs["left_object_points"] >> left_object_points;
+    // fs["right_object_points"] >> right_object_points;
+
+    // fs.release();
+
+    // stereo::avg_calibration(
+    //     left_object_points,
+    //     right_object_points,
+    //     board_size,
+    //     resolution,
+    //     square_size,
+    //     bucket_percentage,
+    //     16,
+    //     8
+    // );
+
     //auto input_pipe { "/home/jack/Mounts/DiskOne/stereo/zed_calibration/compiled.mp4" };
     //auto input_pipe { "/dev/video2" };
     //auto input_pipe { "videotestsrc pattern=10 ! videoconvert ! appsink" };
@@ -23,13 +44,13 @@ int main() {
     auto output_pipe { "appsrc ! videoconvert ! videorate ! video/x-raw,framerate=15/1,format=I420 ! avenc_mpeg1video bitrate=200000 maxrate=400000 ! mpegtsmux ! udpsink host=0.0.0.0 port=3131" };
     //auto output_pipe { "appsrc stream-type=1 is-live=true ! videoconvert ! video/x-raw,framerate=30/1,format=I420 ! videoconvert ! videorate ! video/x-raw,framerate=15/1 ! avenc_mpeg1video noise-reduction=512 bitrate=100000 ! mpegtsmux ! udpsink host=0.0.0.0 port=3131" };
 
-    stereo::calibrate_from_file(
-        "points.yml.gz",
-        board_size,
-        cv::Size(1280, 720),
-        square_size,
-        bucket_percentage
-    );
+    // stereo::calibrate_from_file(
+    //     "points.yml.gz",
+    //     board_size,
+    //     cv::Size(1280, 720),
+    //     square_size,
+    //     bucket_percentage
+    // );
 
     try {
         calib::calibrate(

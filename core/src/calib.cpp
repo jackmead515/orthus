@@ -12,7 +12,7 @@
 
 namespace calib {
 
-    // quit flag
+    // quit flag to indicate the calibration should stop
     static bool quit { false };
 
     // flag to indicate if calibration is in progress
