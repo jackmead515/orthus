@@ -30,30 +30,30 @@ namespace stereo {
         cv::Mat undistortion_map_right;
         cv::Mat rectification_map_left;
         cv::Mat rectification_map_right;
-
-        void save(std::string file) {
-            cv::FileStorage fs(file, cv::FileStorage::WRITE);
-            fs << "rms" << rms;
-            fs << "left_camera_matrix" << left_camera_matrix;
-            fs << "left_dist_coeffs" << left_dist_coeffs;
-            fs << "right_camera_matrix" << right_camera_matrix;
-            fs << "right_dist_coeffs" << right_dist_coeffs;
-            fs << "R" << R;
-            fs << "T" << T;
-            fs << "E" << E;
-            fs << "F" << F;
-            fs << "rectification_left" << rectification_left;
-            fs << "rectification_right" << rectification_right;
-            fs << "proj_mats_left" << proj_mats_left;
-            fs << "proj_mats_right" << proj_mats_right;
-            fs << "disp_to_depth_mat" << disp_to_depth_mat;
-            fs << "undistortion_map_left" << undistortion_map_left;
-            fs << "undistortion_map_right" << undistortion_map_right;
-            fs << "rectification_map_left" << rectification_map_left;
-            fs << "rectification_map_right" << rectification_map_right;
-            fs.release();
-        }
     };
+
+    void save(std::string file, Calibration& calibration) {
+        cv::FileStorage fs(file, cv::FileStorage::WRITE);
+        fs << "rms" << calibration.rms;
+        fs << "left_camera_matrix" << calibration.left_camera_matrix;
+        fs << "left_dist_coeffs" << calibration.left_dist_coeffs;
+        fs << "right_camera_matrix" << calibration.right_camera_matrix;
+        fs << "right_dist_coeffs" << calibration.right_dist_coeffs;
+        fs << "R" << calibration.R;
+        fs << "T" << calibration.T;
+        fs << "E" << calibration.E;
+        fs << "F" << calibration.F;
+        fs << "rectification_left" << calibration.rectification_left;
+        fs << "rectification_right" << calibration.rectification_right;
+        fs << "proj_mats_left" << calibration.proj_mats_left;
+        fs << "proj_mats_right" << calibration.proj_mats_right;
+        fs << "disp_to_depth_mat" << calibration.disp_to_depth_mat;
+        fs << "undistortion_map_left" << calibration.undistortion_map_left;
+        fs << "undistortion_map_right" << calibration.undistortion_map_right;
+        fs << "rectification_map_left" << calibration.rectification_map_left;
+        fs << "rectification_map_right" << calibration.rectification_map_right;
+        fs.release();
+    }
 
     Calibration calibrate(
         std::vector<std::vector<cv::Point2f>>& left_object_points,
@@ -166,9 +166,9 @@ namespace stereo {
         cv::Mat right_translation; // translation matrix specific to right camera
 
         cv::TermCriteria criteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, 1e-5);
-        //int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_SAME_FOCAL_LENGTH };
+        int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_SAME_FOCAL_LENGTH };
         //int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST };
-        int flags { cv::CALIB_SAME_FOCAL_LENGTH + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_SAME_FOCAL_LENGTH };
+        //int flags { cv::CALIB_SAME_FOCAL_LENGTH + cv::CALIB_ZERO_TANGENT_DIST };
 
         // double left_rms = cv::calibrateCamera(
         //     object_points,
@@ -206,7 +206,7 @@ namespace stereo {
         cv::Mat E; // essential matrix for stereo camera
         cv::Mat F; // fundamental matrix for stereo camera
 
-        double stereo_rms = cv::stereoCalibrate(
+        double rms = cv::stereoCalibrate(
             object_points,
             left_points,
             right_points,
@@ -241,7 +241,8 @@ namespace stereo {
             rectification_right,
             proj_mats_left,
             proj_mats_right,
-            disp_to_depth_mat
+            disp_to_depth_mat,
+            cv::CALIB_ZERO_DISPARITY
         );
 
         cv::Mat undistortion_map_left;
@@ -272,7 +273,7 @@ namespace stereo {
         );
 
         return Calibration {
-            rms: stereo_rms,
+            rms,
             left_camera_matrix,
             left_dist_coeffs,
             right_camera_matrix,
@@ -293,7 +294,7 @@ namespace stereo {
         };
     }
 
-    void avg_calibration(
+    std::vector<Calibration> avg_calibration(
         std::vector<std::vector<cv::Point2f>>& left_object_points,
         std::vector<std::vector<cv::Point2f>>& right_object_points,
         cv::Size board_size,
@@ -319,30 +320,18 @@ namespace stereo {
                 thread_pool.push_back(std::thread([&] {
                     Calibration calibration { calibrate(left_object_points, right_object_points, board_size, image_size, square_size, bucket_percentage) };
                     lock.lock();
-                    std::cout << "rms: " << calibration.rms << std::endl;
                     calibrations.push_back(calibration);
                     lock.unlock();
                 }));
             }
 
-            for (int i {0}; i < threads; i++) {
-                thread_pool[i].join();
-            }
+            for (int i {0}; i < threads; i++) thread_pool[i].join();
 
-            completed += threads;
+            completed += amount;
 
         } while (completed < iterations);
 
-        double avg_rms {0};
-
-        for (int i {0}; i < calibrations.size(); i++) {
-            avg_rms += calibrations[i].rms;
-        }
-
-        avg_rms /= calibrations.size();
-
-        std::cout << "average rms: " << avg_rms << std::endl;
-
+        return calibrations;
     }
 
     void calibrate_from_file(
@@ -364,6 +353,6 @@ namespace stereo {
 
         Calibration calibration { calibrate(left_object_points, right_object_points, board_size, image_size, square_size, bucket_percentage) };
 
-        calibration.save("calibration.yml.gz");
+        save("calibration.yml.gz", calibration);
     }
 }

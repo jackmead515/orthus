@@ -7,6 +7,7 @@
 namespace stereo {
 
     struct Calibration {
+        double rms;
         cv::Mat left_camera_matrix;
         cv::Mat left_dist_coeffs;
         cv::Mat right_camera_matrix;
@@ -24,9 +25,9 @@ namespace stereo {
         cv::Mat undistortion_map_right;
         cv::Mat rectification_map_left;
         cv::Mat rectification_map_right;
-
-        void save(std::string file);
     };
+
+    void save(std::string file, Calibration& calibration);
 
     Calibration calibrate(
         std::vector<std::vector<cv::Point2f>>& left_object_points,
@@ -37,7 +38,7 @@ namespace stereo {
         double bucket_percentage
     );
 
-    void avg_calibration(
+    std::vector<Calibration> avg_calibration(
         std::vector<std::vector<cv::Point2f>>& left_object_points,
         std::vector<std::vector<cv::Point2f>>& right_object_points,
         cv::Size board_size,

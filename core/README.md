@@ -72,30 +72,4 @@ Verify the device was created
 v4l2-ctl --list-devices
 ```
 
-Run the Orthus binary
-
-```bash
-./orthus
-```
-
-In another process, stream the output with FFMPEG. This one outputs to a UDP stream
-
-```bash
-ffmpeg \
-    -an \
-    -f v4l2 \
-    -i - \
-    -video_size 1280x720 \
-    -framerate 30 \
-    -r 30 \
-    -f mpegts \
-    -vcodec mpeg1video \
-    -qscale:v 10 \
-    udp://0.0.0.0:3131
-```
-
-Then, use ffplay to view the stream
-
-```bash
-ffplay udp://0.0.0.0:3131
-```
+To get rid of these artifacts we post-process the disparity image with a speckle filter controlled by the speckle_size and speckle_range parameters. speckle_size is the number of pixels below which a disparity blob is dismissed as "speckle." speckle_range controls how close in value disparities must be to be considered part of the same blob. In this case the objects in the scene are relatively large, so we can crank speckle_size up to 1000 pixels: 
