@@ -27,7 +27,29 @@ namespace stereo {
         cv::Mat rectification_map_right;
     };
 
-    void save(std::string file, Calibration& calibration);
+    struct BlockMatching {
+        int max_speckle_size;
+        int max_speckle_diff;
+        int block_size;
+        int min_disparity;
+        int num_disparities;
+        int texture_threshold;
+        int uniqueness_ratio;
+        int speckle_window_size;
+        int speckle_range;
+        int disp12_max_diff;
+        int pre_filter_type;
+        int pre_filter_size;
+        int pre_filter_cap;
+    };
+
+    void save_calibration(std::string file, Calibration& calibration);
+
+    Calibration load_calibration(std::string file);
+
+    BlockMatching load_blockmatching(std::string file);
+
+    void save_blockmatching(std::string file, BlockMatching& blockmatch);
 
     Calibration calibrate(
         std::vector<std::vector<cv::Point2f>>& left_object_points,
@@ -45,6 +67,7 @@ namespace stereo {
         cv::Size image_size,
         double square_size,
         double bucket_percentage,
+        double rms_threshold,
         int iterations,
         int threads
     );

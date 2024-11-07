@@ -32,7 +32,23 @@ namespace stereo {
         cv::Mat rectification_map_right;
     };
 
-    void save(std::string file, Calibration& calibration) {
+    struct BlockMatching {
+        int max_speckle_size;
+        int max_speckle_diff;
+        int block_size;
+        int min_disparity;
+        int num_disparities;
+        int texture_threshold;
+        int uniqueness_ratio;
+        int speckle_window_size;
+        int speckle_range;
+        int disp12_max_diff;
+        int pre_filter_type;
+        int pre_filter_size;
+        int pre_filter_cap;
+    };
+
+    void save_calibration(std::string file, Calibration& calibration) {
         cv::FileStorage fs(file, cv::FileStorage::WRITE);
         fs << "rms" << calibration.rms;
         fs << "left_camera_matrix" << calibration.left_camera_matrix;
@@ -55,6 +71,83 @@ namespace stereo {
         fs.release();
     }
 
+    Calibration load_calibration(std::string file) {
+        cv::FileStorage fs(file, cv::FileStorage::READ);
+
+        if (!fs.isOpened()) {
+            throw std::runtime_error("Failed to open calibration file: " + file);
+        }
+
+        Calibration calibration;
+
+        fs["rms"] >> calibration.rms;
+        fs["left_camera_matrix"] >> calibration.left_camera_matrix;
+        fs["left_dist_coeffs"] >> calibration.left_dist_coeffs;
+        fs["right_camera_matrix"] >> calibration.right_camera_matrix;
+        fs["right_dist_coeffs"] >> calibration.right_dist_coeffs;
+        fs["R"] >> calibration.R;
+        fs["T"] >> calibration.T;
+        fs["E"] >> calibration.E;
+        fs["F"] >> calibration.F;
+        fs["rectification_left"] >> calibration.rectification_left;
+        fs["rectification_right"] >> calibration.rectification_right;
+        fs["proj_mats_left"] >> calibration.proj_mats_left;
+        fs["proj_mats_right"] >> calibration.proj_mats_right;
+        fs["disp_to_depth_mat"] >> calibration.disp_to_depth_mat;
+        fs["undistortion_map_left"] >> calibration.undistortion_map_left;
+        fs["undistortion_map_right"] >> calibration.undistortion_map_right;
+        fs["rectification_map_left"] >> calibration.rectification_map_left;
+        fs["rectification_map_right"] >> calibration.rectification_map_right;
+        fs.release();
+
+        return calibration;
+    }
+
+    BlockMatching load_blockmatching(std::string file) {
+        cv::FileStorage fs(file, cv::FileStorage::READ);
+
+        if (!fs.isOpened()) {
+            throw std::runtime_error("Failed to open block matching file: " + file);
+        }
+
+        BlockMatching blockmatch;
+
+        fs["max_speckle_size"] >> blockmatch.max_speckle_size;
+        fs["max_speckle_diff"] >> blockmatch.max_speckle_diff;
+        fs["block_size"] >> blockmatch.block_size;
+        fs["min_disparity"] >> blockmatch.min_disparity;
+        fs["num_disparities"] >> blockmatch.num_disparities;
+        fs["texture_threshold"] >> blockmatch.texture_threshold;
+        fs["uniqueness_ratio"] >> blockmatch.uniqueness_ratio;
+        fs["speckle_window_size"] >> blockmatch.speckle_window_size;
+        fs["speckle_range"] >> blockmatch.speckle_range;
+        fs["disp12_max_diff"] >> blockmatch.disp12_max_diff;
+        fs["pre_filter_type"] >> blockmatch.pre_filter_type;
+        fs["pre_filter_size"] >> blockmatch.pre_filter_size;
+        fs["pre_filter_cap"] >> blockmatch.pre_filter_cap;
+        fs.release();
+
+        return blockmatch;
+    }
+
+    void save_blockmatching(std::string file, BlockMatching& blockmatch) {
+        cv::FileStorage fs(file, cv::FileStorage::WRITE);
+        fs << "max_speckle_size" << blockmatch.max_speckle_size;
+        fs << "max_speckle_diff" << blockmatch.max_speckle_diff;
+        fs << "block_size" << blockmatch.block_size;
+        fs << "min_disparity" << blockmatch.min_disparity;
+        fs << "num_disparities" << blockmatch.num_disparities;
+        fs << "texture_threshold" << blockmatch.texture_threshold;
+        fs << "uniqueness_ratio" << blockmatch.uniqueness_ratio;
+        fs << "speckle_window_size" << blockmatch.speckle_window_size;
+        fs << "speckle_range" << blockmatch.speckle_range;
+        fs << "disp12_max_diff" << blockmatch.disp12_max_diff;
+        fs << "pre_filter_type" << blockmatch.pre_filter_type;
+        fs << "pre_filter_size" << blockmatch.pre_filter_size;
+        fs << "pre_filter_cap" << blockmatch.pre_filter_cap;
+        fs.release();
+    }
+
     Calibration calibrate(
         std::vector<std::vector<cv::Point2f>>& left_object_points,
         std::vector<std::vector<cv::Point2f>>& right_object_points,
@@ -66,7 +159,7 @@ namespace stereo {
 
         // get a list of the indicies and shuffle them to randomly select points
         std::vector<int> indicies(left_object_points.size());
-        for (int i {0}; i < left_object_points.size(); i++) indicies.push_back(i);
+        for (u_int16_t i {0}; i < left_object_points.size(); i++) indicies.push_back(i);
         std::shuffle(indicies.begin(), indicies.end(), std::random_device());
 
         // we want to gather images equally distributed over the image plane.
@@ -88,21 +181,17 @@ namespace stereo {
         // This is to avoid floating point errors.
         int int_perc = static_cast<int>(bucket_percentage * 100);
         
-        for (int xp { 0 }; xp < 100; xp += int_perc) {
-            for (int yp { 0 }; yp < 100; yp += int_perc) {
+        for (u_int16_t xp { 0 }; xp < 100; xp += int_perc) {
+            for (u_int16_t yp { 0 }; yp < 100; yp += int_perc) {
                 
                 // Calculate the x and y coordinates based on the percentage of the image plane.
                 // Again, this produces a double value, but we want that because our object points are doubles.
                 double x = (static_cast<double>(xp)/100.0) * static_cast<double>(image_size.width);
                 double y = (static_cast<double>(yp)/100.0) * static_cast<double>(image_size.height);
 
-                // std::cout << "x: " << x << " y: " << y << " w: " << bucket_width << " h: " << bucket_height << std::endl;
-
-                for (int i { 0 }; i < indicies.size(); i++) {
+                for (u_int16_t i { 0 }; i < indicies.size(); i++) {
                     int index = indicies[i];
                     cv::Point2f left_point = left_object_points[index][0];
-
-                    //std::cout << "left_point: " << left_point << std::endl;
 
                     // if the point is within the bucekt, we can add the entire point set
                     // and remove that point set from the list of options.
@@ -146,7 +235,7 @@ namespace stereo {
 
         std::vector<std::vector<cv::Point3f>> object_points;
     
-        for (int i {0}; i < left_points.size(); i++) {
+        for (u_int16_t i {0}; i < left_points.size(); i++) {
             std::vector<cv::Point3f> point_coords;
             for (int x {0}; x < board_size.width; x++) {
                 for (int y {0}; y < board_size.height; y++) {
@@ -301,6 +390,7 @@ namespace stereo {
         cv::Size image_size,
         double square_size,
         double bucket_percentage,
+        double rms_threshold,
         int iterations,
         int threads
     ) {
@@ -319,6 +409,9 @@ namespace stereo {
             for (int i {0}; i < amount; i++) {
                 thread_pool.push_back(std::thread([&] {
                     Calibration calibration { calibrate(left_object_points, right_object_points, board_size, image_size, square_size, bucket_percentage) };
+
+                    if (calibration.rms > rms_threshold) return;
+
                     lock.lock();
                     calibrations.push_back(calibration);
                     lock.unlock();
@@ -353,6 +446,6 @@ namespace stereo {
 
         Calibration calibration { calibrate(left_object_points, right_object_points, board_size, image_size, square_size, bucket_percentage) };
 
-        save("calibration.yml.gz", calibration);
+        save_calibration("calibration.yml.gz", calibration);
     }
 }

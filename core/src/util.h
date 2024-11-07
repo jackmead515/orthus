@@ -3,31 +3,33 @@
 namespace util {
 
     struct FPS {
-        int fps_buffer_len;
+        int buffer_len;
 
-        int fps_index;
+        int index;
 
         double value;
 
-        double fps_buffer[32];
+        double buffer[32];
 
-        double sum_sec;
+        double sum;
 
-        bool ready;
+        FPS() {
+            this->buffer_len = 32;
+            this->index = 0;
+            this->value = 0.0;
+            this->sum = 0.0;
+            for (int i {0}; i < this->buffer_len; i++) this->buffer[i] = 0.0;
+        }
 
-        // // initialize the FPS buffer. Fills the buffer with 0.0
-        // FPS();
-
-        // // update the FPS value if the fps_index has reached the buffer length
         void update(double duration) {
-            fps_buffer[fps_index] = duration;
-            sum_sec += duration;
-            fps_index++;
+            this->buffer[index] = duration;
+            this->sum += duration;
+            this->index++;
 
-            if (fps_index >= fps_buffer_len) {
-                fps_index = 0;
-                value = static_cast<double>(fps_buffer_len) / sum_sec;
-                sum_sec = 0.0;
+            if (this->index >= this->buffer_len) {
+                this->index = 0;
+                this->value = static_cast<double>(this->buffer_len) / this->sum;
+                this->sum = 0.0;
             }
         }
     };
