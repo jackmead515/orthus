@@ -5,6 +5,8 @@ project( orthus )
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
+find_package(fmt REQUIRED)
+
 # Build for release (with optimizations) by default
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
@@ -18,3 +20,4 @@ file(GLOB SOURCES
 )
 add_executable( orthus ${SOURCES} )
 target_link_libraries( orthus ${OpenCV_LIBS})
+target_link_libraries( orthus fmt::fmt)

@@ -2,13 +2,14 @@
 #include <chrono>
 #include <thread>
 
+#include <fmt/core.h>
 #include <opencv2/opencv.hpp>
 
 #include "util.h"
 #include "stereo.h"
 
 // display opencv window for debugging
-#define DEBUG_WINDOW
+// #define DEBUG_WINDOW
 
 namespace calib {
 
@@ -447,10 +448,12 @@ namespace calib {
             cv::resize(disparity, disparity, output_size);
             cv::addWeighted(remapped_left, 0.4, disparity, 0.6, 0.0, display);
 
-            auto display_str = "FPS: " + std::to_string(fps_clock.value) + " | RMS: " + std::to_string(calib::calibration.rms) + " | Depth (m): " + std::to_string(avg_depth);
-            auto text_size = cv::getTextSize(display_str, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
+        
+            auto display_str = fmt::format("FPS: {:.2f} | RMS: {:.2f} | Depth (cm): {:.2f}", fps_clock.value, calib::calibration.rms, avg_depth);
+            //auto display_str = "FPS: " + std::to_string(fps_clock.value) + " | RMS: " + std::to_string(calib::calibration.rms) + " | Depth (m): " + std::to_string(avg_depth);
+            auto text_size = cv::getTextSize(display_str, cv::FONT_HERSHEY_SIMPLEX, 0.35, 1, nullptr);
             cv::rectangle(display, cv::Point(8, 8), cv::Point(text_size.width + 12, text_size.height + 12), cv::Scalar(0, 0, 0), cv::FILLED);
-            cv::putText(display, display_str, cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
+            cv::putText(display, display_str, cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.35, cv::Scalar(255, 255, 255), 1);
 
             #ifdef DEBUG_WINDOW // display opencv window for debugging
             cv::imshow("Calibration", display);
