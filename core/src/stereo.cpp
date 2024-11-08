@@ -383,7 +383,7 @@ namespace stereo {
         };
     }
 
-    std::vector<Calibration> avg_calibration(
+    std::vector<Calibration> iter_calibration(
         std::vector<std::vector<cv::Point2f>>& left_object_points,
         std::vector<std::vector<cv::Point2f>>& right_object_points,
         cv::Size board_size,

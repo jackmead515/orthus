@@ -9,8 +9,8 @@
 
 enum Mode {
     NEW_CALIBRATION = 0,
-    REVIEW_CALIBRATION = 1,
-    MULTI_CALIBRATION = 2
+    MULTI_CALIBRATION = 1,
+    REVIEW_CALIBRATION = 2,
 };
 
 void multi_calib(
@@ -38,7 +38,32 @@ void multi_calib(
     fs["right_object_points"] >> right_object_points;
     fs.release();
 
-    auto calibrations = stereo::avg_calibration(
+    if (iterations == 1) {
+        stereo::Calibration calibration { 
+            stereo::calibrate(
+                left_object_points,
+                right_object_points,
+                board_size,
+                resolution,
+                square_size,
+                bucket_percentage
+            )
+        };
+
+        if (calibration.rms > rms_threshold) {
+            std::cerr << "calibration failed: rms: " << calibration.rms << std::endl;
+            std::exit(1);
+        }
+
+        std::cout << "calibration rms: " << calibration.rms << std::endl;
+
+        stereo::save_calibration(calibration_file, calibration);
+
+        return;
+
+    }
+
+    auto calibrations = stereo::iter_calibration(
         left_object_points,
         right_object_points,
         board_size,
@@ -61,20 +86,33 @@ void multi_calib(
 
     // find the calibration closest to the average rms
     double min_diff = std::numeric_limits<double>::max();
-    int best_calibration_index = 0;
+    int avg_calibration_index = 0;
     for (int i {0}; i < calibrations.size(); i++) {
         double diff = std::abs(calibrations[i].rms - avg_rms);
         if (diff < min_diff) {
             min_diff = diff;
-            best_calibration_index = i;
+            avg_calibration_index = i;
         }
     }
 
-    stereo::Calibration best_calibration = calibrations[best_calibration_index];
+    //find the calibration with the lowest rms
+    double min_rms = std::numeric_limits<double>::max();
+    int min_calibration_index = 0;
+    for (int i {0}; i < calibrations.size(); i++) {
+        if (calibrations[i].rms < min_rms) {
+            min_rms = calibrations[i].rms;
+            min_calibration_index = i;
+        }
+    }
 
-    std::cout << "selected calibration rms: " << best_calibration.rms << std::endl;
+    stereo::Calibration avg_calibration = calibrations[avg_calibration_index];
+    stereo::Calibration min_calibration = calibrations[min_calibration_index];
 
-    stereo::save_calibration(calibration_file, best_calibration);
+    std::cout << "avg calibration rms: " << avg_calibration.rms << std::endl;
+    std::cout << "min calibration rms: " << min_calibration.rms << std::endl;
+
+    stereo::save_calibration(std::string("avg_" + calibration_file), avg_calibration);
+    stereo::save_calibration(std::string("min_" + calibration_file), min_calibration);
 }
 
 int main(int argc, char* argv[]) {

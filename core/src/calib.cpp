@@ -68,7 +68,7 @@ namespace calib {
         right_object_points.reserve(target_point_sets);
 
         int find_board_flags { cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE | cv::CALIB_CB_FAST_CHECK };
-        cv::TermCriteria subpix_flags(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 50, 0.001);
+        cv::TermCriteria subpix_flags(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 50, 0.001);
 
         while (true) {
             if (calib::quit || calib::point_sets_found >= target_point_sets) {
@@ -284,7 +284,7 @@ namespace calib {
 
                 cv::addWeighted(remapped_left, 0.4, disparity, 0.6, 0.0, display);
 
-                auto display_str = "FPS: " + std::to_string(fps_clock.value) + " | RMS: " + std::to_string(calib::calibration.rms) + " | Depth (cm): " + std::to_string(avg_depth);
+                auto display_str = fmt::format("FPS: {:.2f} | RMS: {:.2f} | Depth (cm): {:.2f}", fps_clock.value, calib::calibration.rms, avg_depth);
                 auto text_size = cv::getTextSize(display_str, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
                 cv::rectangle(display, cv::Point(8, 8), cv::Point(text_size.width + 12, text_size.height + 12), cv::Scalar(0, 0, 0), cv::FILLED);
                 cv::putText(display, display_str, cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);

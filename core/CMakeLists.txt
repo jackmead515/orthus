@@ -5,6 +5,7 @@ project( orthus )
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
+# fmt library
 find_package(fmt REQUIRED)
 
 # Build for release (with optimizations) by default
