@@ -6,6 +6,7 @@
 #include "util.h"
 #include "calib.h"
 #include "stereo.h"
+#include "stream.h"
 
 enum Mode {
     NEW_CALIBRATION = 0,
@@ -220,6 +221,7 @@ int main(int argc, char* argv[]) {
             iterations,
             threads
         );
+
     } else if (mode == Mode::REVIEW_CALIBRATION) {
         std::string calibration_file = "calibration.yml.gz";
         std::string blockmatch_file = "block_matching.yml";
@@ -268,6 +270,7 @@ int main(int argc, char* argv[]) {
         std::cout << "resolution: " << resolution << std::endl;
         std::cout << "fps: " << fps << std::endl;
 
+        //stream::stream()
     }
 
     //auto input_pipe { "/home/jack/Mounts/DiskOne/stereo/zed_calibration/compiled.mp4" };

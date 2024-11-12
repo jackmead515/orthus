@@ -6,7 +6,11 @@ mod = Blueprint('stream', __name__)
 
 @mod.route('/api/stream', methods=['POST'])
 def create_stream():
-    stream_service.launch_stream()
+
+    # build stream_config
+    stream_config = "orthus --help"
+    
+    stream_service.launch_stream(stream_config)
     
     return 'OK', 200
 

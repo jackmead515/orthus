@@ -25,19 +25,19 @@ def kill_stream():
 
         _stream = None
 
-        # final any ffmpeg processes that may have been left running
-        subprocess.run(['pkill', 'ffmpeg'])
+        # final any orthus processes that may have been left running
+        subprocess.run(['pkill', 'orthus'])
 
 
-def launch_stream():
+def launch_stream(stream_config: str):
     global _stream, _streams_lock
     
     kill_stream()
 
     with _streams_lock:
-        logging.info(f'Running ffmpeg pipeline: {shlex.split(config.STREAM_CONFIG)}')
+        logging.info(f'Running pipeline: {shlex.split(stream_config)}')
 
         if config.DEBUG:
-            _stream = subprocess.Popen(shlex.split(config.STREAM_CONFIG), shell=True, cwd=config.RECORD_DIRECTORY)
+            _stream = subprocess.Popen(shlex.split(stream_config), shell=True, cwd=config.RECORD_DIRECTORY)
         else:
-            _stream = subprocess.Popen(shlex.split(config.STREAM_CONFIG), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=config.RECORD_DIRECTORY)
+            _stream = subprocess.Popen(shlex.split(stream_config), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=config.RECORD_DIRECTORY)
