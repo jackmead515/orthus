@@ -2,11 +2,11 @@
 ---
 max_speckle_size: 4096
 max_speckle_diff: 64
-block_size: 31
+block_size: 21
 min_disparity: 0
 num_disparities: 128
 texture_threshold: 400
-uniqueness_ratio: 4
+uniqueness_ratio: 1
 speckle_window_size: 1024
 speckle_range: 16
 disp12_max_diff: 32

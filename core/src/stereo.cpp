@@ -12,7 +12,8 @@ int random_int(int min, int max) {
 namespace stereo {
 
     struct Calibration {
-        double rms;
+        double reprojection_error;
+        double epipolar_error;
         cv::Mat left_camera_matrix;
         cv::Mat left_dist_coeffs;
         cv::Mat right_camera_matrix;
@@ -26,6 +27,9 @@ namespace stereo {
         cv::Mat proj_mats_left;
         cv::Mat proj_mats_right;
         cv::Mat disp_to_depth_mat;
+    };
+
+    struct RectificationMaps {
         cv::Mat undistortion_map_left;
         cv::Mat undistortion_map_right;
         cv::Mat rectification_map_left;
@@ -48,9 +52,87 @@ namespace stereo {
         int pre_filter_cap;
     };
 
+    double compute_epipolar_error(
+        std::vector<std::vector<cv::Point2f>>& left_object_points,
+        std::vector<std::vector<cv::Point2f>>& right_object_points,
+        cv::Mat& left_camera_matrix,
+        cv::Mat& left_dist_coeffs,
+        cv::Mat& right_camera_matrix,
+        cv::Mat& right_dist_coeffs,
+        cv::Mat& F
+    ) {
+        double error { 0.0 };
+        int num_points { 0 };
+
+        std::vector<cv::Vec3f> left_lines;
+        std::vector<cv::Vec3f> right_lines;
+
+        for (uint16_t i { 0 }; i < left_object_points.size(); i++) {
+            int lp = left_object_points[i].size();
+            cv::Mat lm(left_object_points[i]);
+            cv::Mat rm(right_object_points[i]);
+
+            cv::undistortPoints(lm, lm, left_camera_matrix, left_dist_coeffs, cv::noArray(), left_camera_matrix);
+            cv::computeCorrespondEpilines(lm, 1, F, left_lines);
+
+            cv::undistortPoints(rm, rm, right_camera_matrix, right_dist_coeffs, cv::noArray(), right_camera_matrix);
+            cv::computeCorrespondEpilines(rm, 2, F, right_lines);
+
+            for (int j { 0 }; j < lp; j++) {
+                double err = std::abs(left_object_points[i][j].x * right_lines[j][0] + left_object_points[i][j].y * right_lines[j][1] + right_lines[j][2]) +
+                             std::abs(right_object_points[i][j].x * left_lines[j][0] + right_object_points[i][j].y * left_lines[j][1] + left_lines[j][2]);
+
+                error += err;
+            }
+
+            num_points += lp;
+        }
+
+        auto avg_error = error / num_points;
+
+        return avg_error;
+    }
+
+    RectificationMaps compute_rectification_maps(Calibration& calibration, cv::Size image_size) {
+        cv::Mat undistortion_map_left;
+        cv::Mat undistortion_map_right;
+        cv::Mat rectification_map_left;
+        cv::Mat rectification_map_right;
+
+        cv::initUndistortRectifyMap(
+            calibration.left_camera_matrix,
+            calibration.left_dist_coeffs,
+            calibration.rectification_left,
+            calibration.proj_mats_left,
+            image_size,
+            CV_32FC1,
+            undistortion_map_left,
+            rectification_map_left
+        );
+
+        cv::initUndistortRectifyMap(
+            calibration.right_camera_matrix,
+            calibration.right_dist_coeffs,
+            calibration.rectification_right,
+            calibration.proj_mats_right,
+            image_size,
+            CV_32FC1,
+            undistortion_map_right,
+            rectification_map_right
+        );
+
+        return RectificationMaps {
+            undistortion_map_left,
+            undistortion_map_right,
+            rectification_map_left,
+            rectification_map_right
+        };
+    }
+
     void save_calibration(std::string file, Calibration& calibration) {
         cv::FileStorage fs(file, cv::FileStorage::WRITE);
-        fs << "rms" << calibration.rms;
+        fs << "reprojection_error" << calibration.reprojection_error;
+        fs << "epipolar_error" << calibration.epipolar_error;
         fs << "left_camera_matrix" << calibration.left_camera_matrix;
         fs << "left_dist_coeffs" << calibration.left_dist_coeffs;
         fs << "right_camera_matrix" << calibration.right_camera_matrix;
@@ -64,10 +146,6 @@ namespace stereo {
         fs << "proj_mats_left" << calibration.proj_mats_left;
         fs << "proj_mats_right" << calibration.proj_mats_right;
         fs << "disp_to_depth_mat" << calibration.disp_to_depth_mat;
-        fs << "undistortion_map_left" << calibration.undistortion_map_left;
-        fs << "undistortion_map_right" << calibration.undistortion_map_right;
-        fs << "rectification_map_left" << calibration.rectification_map_left;
-        fs << "rectification_map_right" << calibration.rectification_map_right;
         fs.release();
     }
 
@@ -80,7 +158,8 @@ namespace stereo {
 
         Calibration calibration;
 
-        fs["rms"] >> calibration.rms;
+        fs["reprojection_error"] >> calibration.reprojection_error;
+        fs["epipolar_error"] >> calibration.epipolar_error;
         fs["left_camera_matrix"] >> calibration.left_camera_matrix;
         fs["left_dist_coeffs"] >> calibration.left_dist_coeffs;
         fs["right_camera_matrix"] >> calibration.right_camera_matrix;
@@ -94,10 +173,6 @@ namespace stereo {
         fs["proj_mats_left"] >> calibration.proj_mats_left;
         fs["proj_mats_right"] >> calibration.proj_mats_right;
         fs["disp_to_depth_mat"] >> calibration.disp_to_depth_mat;
-        fs["undistortion_map_left"] >> calibration.undistortion_map_left;
-        fs["undistortion_map_right"] >> calibration.undistortion_map_right;
-        fs["rectification_map_left"] >> calibration.rectification_map_left;
-        fs["rectification_map_right"] >> calibration.rectification_map_right;
         fs.release();
 
         return calibration;
@@ -205,41 +280,13 @@ namespace stereo {
             }
         }
 
-        // double col_coords[board_size.width];
-        // for (int i {0}; i < board_size.width; i++) {
-        //   col_coords[i] = i % board_size.width * square_size;
-        // }
-
-        // int r = 0;
-        // double c = 0;
-        // double coords[board_size.area()][3];
-        // for (int i {0}; i < board_size.area(); i++) {
-        //   coords[i][0] = col_coords[r];
-        //   coords[i][1] = c;
-        //   coords[i][2] = 0;
-
-        //   r++;
-        //   if (r == board_size.height) {
-        //     r = 0;
-        //     c += square_size;
-        //   }
-        // }
-
-        // for (int i {0}; i < sample_size; i++) {
-        //   std::vector<cv::Point3f> point_coords;
-        //   for (int j {0}; j < board_size.area(); j++) {
-        //     point_coords.push_back(cv::Point3f(coords[j][0], coords[j][1], coords[j][2]));
-        //   }
-        //   object_points.push_back(point_coords);
-        // }
-
+        // Get the object point coordinates buffer;
         std::vector<std::vector<cv::Point3f>> object_points;
-    
         for (u_int16_t i {0}; i < left_points.size(); i++) {
             std::vector<cv::Point3f> point_coords;
-            for (int x {0}; x < board_size.width; x++) {
-                for (int y {0}; y < board_size.height; y++) {
-                    point_coords.push_back(cv::Point3f((double)x * square_size, (double)y * square_size, 0));
+            for (int j {0}; j < board_size.height; j++) {
+                for (int i {0}; i < board_size.width; i++) {
+                    point_coords.push_back(cv::Point3f((double)i * square_size, (double)j * square_size, 0));
                 }
             }
             object_points.push_back(point_coords);
@@ -258,6 +305,9 @@ namespace stereo {
         int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_SAME_FOCAL_LENGTH };
         //int flags { cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST };
         //int flags { cv::CALIB_SAME_FOCAL_LENGTH + cv::CALIB_ZERO_TANGENT_DIST };
+
+        left_camera_matrix = initCameraMatrix2D(object_points, left_points, image_size, 0);
+        right_camera_matrix = initCameraMatrix2D(object_points, right_points, image_size, 0);
 
         // double left_rms = cv::calibrateCamera(
         //     object_points,
@@ -295,7 +345,7 @@ namespace stereo {
         cv::Mat E; // essential matrix for stereo camera
         cv::Mat F; // fundamental matrix for stereo camera
 
-        double rms = cv::stereoCalibrate(
+        double reprojection_error = cv::stereoCalibrate(
             object_points,
             left_points,
             right_points,
@@ -310,6 +360,16 @@ namespace stereo {
             F,
             flags,
             criteria
+        );
+
+        double epipolar_error = stereo::compute_epipolar_error(
+            left_points,
+            right_points,
+            left_camera_matrix,
+            left_dist_coeffs,
+            right_camera_matrix,
+            right_dist_coeffs,
+            F
         );
 
         cv::Mat rectification_left;
@@ -334,35 +394,9 @@ namespace stereo {
             cv::CALIB_ZERO_DISPARITY
         );
 
-        cv::Mat undistortion_map_left;
-        cv::Mat undistortion_map_right;
-        cv::Mat rectification_map_left;
-        cv::Mat rectification_map_right;
-
-        cv::initUndistortRectifyMap(
-            left_camera_matrix,
-            left_dist_coeffs,
-            rectification_left,
-            proj_mats_left,
-            image_size,
-            CV_32FC1,
-            undistortion_map_left,
-            rectification_map_left
-        );
-
-        cv::initUndistortRectifyMap(
-            right_camera_matrix,
-            right_dist_coeffs,
-            rectification_right,
-            proj_mats_right,
-            image_size,
-            CV_32FC1,
-            undistortion_map_right,
-            rectification_map_right
-        );
-
         return Calibration {
-            rms,
+            reprojection_error,
+            epipolar_error,
             left_camera_matrix,
             left_dist_coeffs,
             right_camera_matrix,
@@ -375,11 +409,7 @@ namespace stereo {
             rectification_right,
             proj_mats_left,
             proj_mats_right,
-            disp_to_depth_mat,
-            undistortion_map_left,
-            undistortion_map_right,
-            rectification_map_left,
-            rectification_map_right
+            disp_to_depth_mat
         };
     }
 
@@ -410,7 +440,7 @@ namespace stereo {
                 thread_pool.push_back(std::thread([&] {
                     Calibration calibration { calibrate(left_object_points, right_object_points, board_size, image_size, square_size, bucket_percentage) };
 
-                    if (calibration.rms > rms_threshold) return;
+                    if (calibration.reprojection_error > rms_threshold) return;
 
                     lock.lock();
                     calibrations.push_back(calibration);

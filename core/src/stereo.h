@@ -7,7 +7,8 @@
 namespace stereo {
 
     struct Calibration {
-        double rms;
+        double reprojection_error;
+        double epipolar_error;
         cv::Mat left_camera_matrix;
         cv::Mat left_dist_coeffs;
         cv::Mat right_camera_matrix;
@@ -21,6 +22,9 @@ namespace stereo {
         cv::Mat proj_mats_left;
         cv::Mat proj_mats_right;
         cv::Mat disp_to_depth_mat;
+    };
+
+    struct RectificationMaps {
         cv::Mat undistortion_map_left;
         cv::Mat undistortion_map_right;
         cv::Mat rectification_map_left;
@@ -42,6 +46,18 @@ namespace stereo {
         int pre_filter_size;
         int pre_filter_cap;
     };
+
+    double compute_epipolar_error(
+        std::vector<std::vector<cv::Point2f>>& left_object_points,
+        std::vector<std::vector<cv::Point2f>>& right_object_points,
+        cv::Mat& left_camera_matrix,
+        cv::Mat& left_dist_coeffs,
+        cv::Mat& right_camera_matrix,
+        cv::Mat& right_dist_coeffs,
+        cv::Mat& F
+    );
+
+    RectificationMaps compute_rectification_maps(Calibration& calibration, cv::Size image_size);
 
     void save_calibration(std::string file, Calibration& calibration);
 

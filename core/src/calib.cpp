@@ -34,6 +34,9 @@ namespace calib {
     // the calibration
     static stereo::Calibration calibration;
 
+    // the rectification maps of the resulting calibration
+    static stereo::RectificationMaps rectification_maps;
+
     // processing lock
     static std::mutex process_lock;
 
@@ -143,9 +146,12 @@ namespace calib {
                     bucket_percentage
                 )
             };
+
+            stereo::RectificationMaps rectification_maps { stereo::compute_rectification_maps(calibration, image_size) };
             
             stereo::save_calibration(calibration_file, calibration);
 
+            calib::rectification_maps = rectification_maps;
             calib::calibration = calibration;
             calib::is_calibrating = false;
             calib::is_calibrated = true;
@@ -165,7 +171,7 @@ namespace calib {
         double bucket_percentage,
         double baseline_mm,
         double fps
-    ) {
+    ) {     
         cv::VideoCapture input(input_pipe, cv::CAP_GSTREAMER);
 
         if (!input.isOpened()) {
@@ -254,8 +260,8 @@ namespace calib {
                 left_frame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
                 right_frame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
 
-                cv::remap(left_frame, remapped_left, calib::calibration.undistortion_map_left, calib::calibration.rectification_map_left, cv::INTER_LINEAR);
-                cv::remap(right_frame, remapped_right, calib::calibration.undistortion_map_right, calib::calibration.rectification_map_right, cv::INTER_LINEAR);
+                cv::remap(left_frame, remapped_left, calib::rectification_maps.undistortion_map_left, calib::rectification_maps.rectification_map_left, cv::INTER_LINEAR);
+                cv::remap(right_frame, remapped_right, calib::rectification_maps.undistortion_map_right, calib::rectification_maps.rectification_map_right, cv::INTER_LINEAR);
                 cv::cvtColor(remapped_left, remapped_left_gray, cv::COLOR_BGR2GRAY);
                 cv::cvtColor(remapped_right, remapped_right_gray, cv::COLOR_BGR2GRAY);
 
@@ -284,7 +290,7 @@ namespace calib {
 
                 cv::addWeighted(remapped_left, 0.4, disparity, 0.6, 0.0, display);
 
-                auto display_str = fmt::format("FPS: {:.2f} | RMS: {:.2f} | Depth (cm): {:.2f}", fps_clock.value, calib::calibration.rms, avg_depth);
+                auto display_str = fmt::format("FPS: {:.2f} | RE: {:.2f} | EE: {:.2f} | Depth (cm): {:.2f}", fps_clock.value, calib::calibration.reprojection_error, calib::calibration.epipolar_error, avg_depth);
                 auto text_size = cv::getTextSize(display_str, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
                 cv::rectangle(display, cv::Point(8, 8), cv::Point(text_size.width + 12, text_size.height + 12), cv::Scalar(0, 0, 0), cv::FILLED);
                 cv::putText(display, display_str, cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
@@ -364,21 +370,10 @@ namespace calib {
 
         std::cout << "Output device: '" << output_pipe  << "' opened" << std::endl;
 
-        cv::FileStorage fs(calibration_file, cv::FileStorage::READ);
+        calib::calibration = stereo::load_calibration(calibration_file);
 
-        if (!fs.isOpened()) {
-            throw std::runtime_error("Failed to open calibration file: " + calibration_file);
-        }
-
-        fs["undistortion_map_left"] >> calib::calibration.undistortion_map_left;
-        fs["rectification_map_left"] >> calib::calibration.rectification_map_left;
-        fs["undistortion_map_right"] >> calib::calibration.undistortion_map_right;
-        fs["rectification_map_right"] >> calib::calibration.rectification_map_right;
-        fs["disp_to_depth_mat"] >> calib::calibration.disp_to_depth_mat;
-        fs["left_camera_matrix"] >> calib::calibration.left_camera_matrix;
-        fs["proj_mats_left"] >> calib::calibration.proj_mats_left;
-        fs["rms"] >> calib::calibration.rms;
-        fs.release();
+        cv::Size image_size { resolution.width / 2, resolution.height };
+        calib::rectification_maps = stereo::compute_rectification_maps(calib::calibration, image_size);
 
         double focal_length = calib::calibration.proj_mats_left.at<double>(0, 0);
     
@@ -421,8 +416,8 @@ namespace calib {
             left_frame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
             right_frame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
 
-            cv::remap(left_frame, remapped_left, calib::calibration.undistortion_map_left, calib::calibration.rectification_map_left, cv::INTER_LINEAR);
-            cv::remap(right_frame, remapped_right, calib::calibration.undistortion_map_right, calib::calibration.rectification_map_right, cv::INTER_LINEAR);
+            cv::remap(left_frame, remapped_left, calib::rectification_maps.undistortion_map_left, calib::rectification_maps.rectification_map_left, cv::INTER_LINEAR);
+            cv::remap(right_frame, remapped_right, calib::rectification_maps.undistortion_map_right, calib::rectification_maps.rectification_map_right, cv::INTER_LINEAR);
             cv::cvtColor(remapped_left, remapped_left_gray, cv::COLOR_BGR2GRAY);
             cv::cvtColor(remapped_right, remapped_right_gray, cv::COLOR_BGR2GRAY);
 
@@ -446,11 +441,10 @@ namespace calib {
 
             cv::resize(remapped_left, remapped_left, output_size);
             cv::resize(disparity, disparity, output_size);
-            cv::addWeighted(remapped_left, 0.4, disparity, 0.6, 0.0, display);
+            cv::addWeighted(remapped_left, 0.6, disparity, 0.4, 0.0, display);
 
         
-            auto display_str = fmt::format("FPS: {:.2f} | RMS: {:.2f} | Depth (cm): {:.2f}", fps_clock.value, calib::calibration.rms, avg_depth);
-            //auto display_str = "FPS: " + std::to_string(fps_clock.value) + " | RMS: " + std::to_string(calib::calibration.rms) + " | Depth (m): " + std::to_string(avg_depth);
+            auto display_str = fmt::format("FPS: {:.2f} | RE: {:.2f} | EE: {:.2f} | Depth (cm): {:.2f}", fps_clock.value, calib::calibration.reprojection_error, calib::calibration.epipolar_error, avg_depth);
             auto text_size = cv::getTextSize(display_str, cv::FONT_HERSHEY_SIMPLEX, 0.35, 1, nullptr);
             cv::rectangle(display, cv::Point(8, 8), cv::Point(text_size.width + 12, text_size.height + 12), cv::Scalar(0, 0, 0), cv::FILLED);
             cv::putText(display, display_str, cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.35, cv::Scalar(255, 255, 255), 1);

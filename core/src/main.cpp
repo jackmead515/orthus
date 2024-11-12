@@ -11,6 +11,7 @@ enum Mode {
     NEW_CALIBRATION = 0,
     MULTI_CALIBRATION = 1,
     REVIEW_CALIBRATION = 2,
+    STREAM = 3
 };
 
 void multi_calib(
@@ -50,12 +51,14 @@ void multi_calib(
             )
         };
 
-        if (calibration.rms > rms_threshold) {
-            std::cerr << "calibration failed: rms: " << calibration.rms << std::endl;
+        if (calibration.reprojection_error > rms_threshold) {
+            std::cerr << "calibration failed. reprojection: " << calibration.reprojection_error << 
+                " epipolar: " << calibration.epipolar_error << std::endl;
             std::exit(1);
         }
 
-        std::cout << "calibration rms: " << calibration.rms << std::endl;
+        std::cout << "calibration reprojection: " << calibration.reprojection_error << 
+            " epipolar: " << calibration.epipolar_error << std::endl;
 
         stereo::save_calibration(calibration_file, calibration);
 
@@ -75,44 +78,32 @@ void multi_calib(
         threads
     );
 
-    double avg_rms {0};
-    for (int i {0}; i < calibrations.size(); i++) avg_rms += calibrations[i].rms;
-    avg_rms /= calibrations.size();
+    double avg_re {0};
+    for (uint16_t i {0}; i < calibrations.size(); i++) avg_re += calibrations[i].reprojection_error;
+    avg_re /= calibrations.size();
 
-    for (int i {0}; i < calibrations.size(); i++) {
-        std::cout << "calibration: " << i << " rms: " << calibrations[i].rms << std::endl;
+    for (uint16_t i {0}; i < calibrations.size(); i++) {
+        std::cout << "calibration: " << i << " reprojection: " << calibrations[i].reprojection_error <<
+            " epipolar: " << calibrations[i].epipolar_error << std::endl;
     }
-    std::cout << "avg_rms: " << avg_rms << std::endl;
 
     // find the calibration closest to the average rms
     double min_diff = std::numeric_limits<double>::max();
     int avg_calibration_index = 0;
-    for (int i {0}; i < calibrations.size(); i++) {
-        double diff = std::abs(calibrations[i].rms - avg_rms);
+    for (uint16_t i {0}; i < calibrations.size(); i++) {
+        double diff = std::abs(calibrations[i].reprojection_error - avg_re);
         if (diff < min_diff) {
             min_diff = diff;
             avg_calibration_index = i;
         }
     }
 
-    //find the calibration with the lowest rms
-    double min_rms = std::numeric_limits<double>::max();
-    int min_calibration_index = 0;
-    for (int i {0}; i < calibrations.size(); i++) {
-        if (calibrations[i].rms < min_rms) {
-            min_rms = calibrations[i].rms;
-            min_calibration_index = i;
-        }
-    }
-
     stereo::Calibration avg_calibration = calibrations[avg_calibration_index];
-    stereo::Calibration min_calibration = calibrations[min_calibration_index];
 
-    std::cout << "avg calibration rms: " << avg_calibration.rms << std::endl;
-    std::cout << "min calibration rms: " << min_calibration.rms << std::endl;
+    std::cout << "selected calibration reprojection: " << avg_calibration.reprojection_error << std::endl;
+    std::cout << "selected calibration epipolar: " << avg_calibration.epipolar_error << std::endl;
 
-    stereo::save_calibration(std::string("avg_" + calibration_file), avg_calibration);
-    stereo::save_calibration(std::string("min_" + calibration_file), min_calibration);
+    stereo::save_calibration(calibration_file, avg_calibration);
 }
 
 int main(int argc, char* argv[]) {
@@ -192,35 +183,6 @@ int main(int argc, char* argv[]) {
             fps
         );
 
-    } else if (mode == Mode::REVIEW_CALIBRATION) {
-        std::string calibration_file = "calibration.yml.gz";
-        std::string blockmatch_file = "block_matching.yml";
-        
-        fs["calibration_file"] >> calibration_file;
-        fs["blockmatch_file"] >> blockmatch_file;
-        fs["baseline_mm"] >> baseline_mm;
-        fs["input_pipe"] >> input_pipe;
-        fs["output_pipe"] >> output_pipe;
-        fs["resolution"] >> resolution;
-        fs["fps"] >> fps;
-
-        std::cout << "Review Calibration Mode" << std::endl;
-        std::cout << "calibration_file: " << calibration_file << std::endl;
-        std::cout << "blockmatch_file: " << blockmatch_file << std::endl;
-        std::cout << "baseline_mm: " << baseline_mm << std::endl;
-        std::cout << "resolution: " << resolution << std::endl;
-        std::cout << "fps: " << fps << std::endl;
-
-        calib::review(
-            calibration_file,
-            blockmatch_file,
-            input_pipe,
-            output_pipe,
-            resolution,
-            baseline_mm,
-            fps
-        );
-
     } else if (mode == Mode::MULTI_CALIBRATION) {
         std::string points_file = "points.yml.gz";
         std::string calibration_file = "calibration.yml.gz";
@@ -258,6 +220,54 @@ int main(int argc, char* argv[]) {
             iterations,
             threads
         );
+    } else if (mode == Mode::REVIEW_CALIBRATION) {
+        std::string calibration_file = "calibration.yml.gz";
+        std::string blockmatch_file = "block_matching.yml";
+        
+        fs["calibration_file"] >> calibration_file;
+        fs["blockmatch_file"] >> blockmatch_file;
+        fs["baseline_mm"] >> baseline_mm;
+        fs["input_pipe"] >> input_pipe;
+        fs["output_pipe"] >> output_pipe;
+        fs["resolution"] >> resolution;
+        fs["fps"] >> fps;
+
+        std::cout << "Review Calibration Mode" << std::endl;
+        std::cout << "calibration_file: " << calibration_file << std::endl;
+        std::cout << "blockmatch_file: " << blockmatch_file << std::endl;
+        std::cout << "baseline_mm: " << baseline_mm << std::endl;
+        std::cout << "resolution: " << resolution << std::endl;
+        std::cout << "fps: " << fps << std::endl;
+
+        calib::review(
+            calibration_file,
+            blockmatch_file,
+            input_pipe,
+            output_pipe,
+            resolution,
+            baseline_mm,
+            fps
+        );
+
+    } else if (mode == Mode::STREAM) { 
+        std::string calibration_file = "calibration.yml.gz";
+        std::string blockmatch_file = "block_matching.yml";
+        
+        fs["calibration_file"] >> calibration_file;
+        fs["blockmatch_file"] >> blockmatch_file;
+        fs["baseline_mm"] >> baseline_mm;
+        fs["input_pipe"] >> input_pipe;
+        fs["output_pipe"] >> output_pipe;
+        fs["resolution"] >> resolution;
+        fs["fps"] >> fps;
+
+        std::cout << "Stream Mode" << std::endl;
+        std::cout << "calibration_file: " << calibration_file << std::endl;
+        std::cout << "blockmatch_file: " << blockmatch_file << std::endl;
+        std::cout << "baseline_mm: " << baseline_mm << std::endl;
+        std::cout << "resolution: " << resolution << std::endl;
+        std::cout << "fps: " << fps << std::endl;
+
     }
 
     //auto input_pipe { "/home/jack/Mounts/DiskOne/stereo/zed_calibration/compiled.mp4" };
